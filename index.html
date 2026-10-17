@@ -20,8 +20,8 @@ h1{font-size:26px;margin:0 0 2px;color:var(--ac)}
 .card b{display:block;font-size:22px}.card span{color:var(--mut);font-size:12px;font-family:system-ui,sans-serif}
 .panel{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:14px}
 .panel h2{font:600 13px system-ui,sans-serif;color:var(--mut);margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em}
-.bars{display:flex;align-items:flex-end;gap:6px;height:110px}
-.bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0}
+.bars{display:flex;align-items:flex-end;gap:6px;height:125px;overflow-x:auto}
+.bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:30px}
 .bar i{display:block;width:100%;background:var(--ac);border-radius:3px 3px 0 0;min-height:2px}
 .bar small{font:10px system-ui,sans-serif;color:var(--mut);margin-top:3px;white-space:nowrap}
 .tools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center}
@@ -147,14 +147,12 @@ function insights(D){
  const mo={};D.forEach(w=>{const k=(w.read||'').slice(0,7);if(k)mo[k]=(mo[k]||0)+1});const bm=Object.entries(mo).sort((a,b)=>b[1]-a[1])[0];
  const tw=D.reduce((s,w)=>s+(w.words||0),0),wn=D.filter(w=>w.words!=null).length;
  const bk=[['Under 10k',0,1e4],['10k–50k',1e4,5e4],['50k–100k',5e4,1e5],['100k+',1e5,1e12]].map(([l,a,b])=>[l,D.filter(w=>w.words!=null&&w.words>=a&&w.words<b).length]);
- const g=D.map(w=>{const h=w.hist||[];if(h.length<2)return null;const f=h[0],l=h[h.length-1];return f.likes!=null&&l.likes!=null?{t:w.title,d:l.likes-f.likes,s:f.d}:null}).filter(x=>x&&x.d>0);
  const S=[
  ['fandom','Fandoms',tbl(top(fd,cnt).map(r3),['Fandom','Works','Words','Avg likes'])],
  ['tags','Tags',`<div class="ig"><div><b>Most read</b>${tbl(top(tg,cnt).map(o=>[esc(o.k),o.n,A(o.avg)]),['Tag','Works','Avg likes'])}</div><div><b>Highest avg likes (2+ works)</b>${tbl(best.map(o=>[esc(o.k),o.n,A(o.avg)]),['Tag','Works','Avg likes'])}</div></div>`],
  ['auth','Authors',tbl(top(au,cnt).map(r3),['Author','Works','Words','Avg likes'])],
  ['pace','Reading pace',tbl([['Works',D.length],['Total words',N(tw)],['Average length',wn?N(Math.round(tw/wn)):'—'],['Longest',lg?esc(lg.title)+' ('+N(lg.words)+')':'—'],['Shortest',sh?esc(sh.title)+' ('+N(sh.words)+')':'—'],['Busiest month',bm?bm[0]+' ('+bm[1]+' works)':'—']],['Stat','Value'])],
- ['mix','Length, rating & status',`<div class="ig"><div><b>Length</b>${tbl(bk,['Range','Works'])}</div><div><b>Rating</b>${tbl(top(grp(D,w=>[w.rating||'']),cnt).map(o=>[esc(o.k),o.n]),['Rating','Works'])}</div><div><b>Status</b>${tbl(top(grp(D,w=>[w.status||'']),cnt).map(o=>[esc(o.k),o.n]),['Status','Works'])}</div></div>`],
- ['gain','Biggest like gainers',tbl(top(g,(a,b)=>b.d-a.d).map(x=>[esc(x.t),'+'+N(x.d),'since '+x.s]),['Work','Likes gained','Tracked'])]];
+ ['mix','Length',tbl(bk,['Range','Works'])]];
  $('ins').innerHTML=S.map(([k,t,h])=>`<details data-k="${k}"${op.includes(k)?' open':''}><summary>${t}</summary><div>${h}</div></details>`).join('')}
 function render(){
  const q=$('search').value.toLowerCase(),fl=$('flt').value;
@@ -169,9 +167,9 @@ function render(){
   return `<tr data-i="${i}" style="cursor:pointer"><td>${href?`<a href="${href}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(w.title||href)}</a>`:esc(w.title)}<div class="sum">${esc([w.fandom,w.rating,w.status].filter(Boolean).join(' · '))}</div></td><td>${esc(w.author)}</td><td class="sum">${esc((w.summary||'').slice(0,160))}${(w.summary||'').length>160?'…':''}</td><td class="n">${fmt(w.words)}</td><td class="n">${fmt(w.likes)}${dl}</td><td class="sum">${esc(w.notes)}</td><td class="n">${esc(w.read)}${w.upd?`<div class="sum">upd ${esc(w.upd)}</div>`:''}</td></tr>`}).join(''):`<tr><td colspan="7" class="empty">${W.length?'No works match this date range or search.':'No works yet. Use Paste import, Import file, or + Add.'}</td></tr>`;
  const rd=D.filter(w=>w.read),tw=rd.reduce((s,w)=>s+(w.words||0),0),au={};D.forEach(w=>{if(w.author)au[w.author]=(au[w.author]||0)+1});
  const top=Object.entries(au).sort((a,b)=>b[1]-a[1])[0],lk=D.filter(w=>w.likes!=null);
- $('cards').innerHTML=[[D.length,'Works in range'],[rd.length,'Read'],[fmt(tw),'Words read'],[lk.length?fmt(Math.round(lk.reduce((s,w)=>s+w.likes,0)/lk.length)):'—','Avg likes'],[top?esc(top[0])+' ('+top[1]+')':'—','Most-bookmarked author']].map(([v,l])=>`<div class="card"><b>${v}</b><span>${l}</span></div>`).join('');
+ $('cards').innerHTML=[[D.length,'Works in range'],[rd.length,'Read'],[fmt(tw),'Words read'],[lk.length?fmt(Math.round(lk.reduce((s,w)=>s+w.likes,0)/lk.length)):'—','Avg likes']].map(([v,l])=>`<div class="card"><b>${v}</b><span>${l}</span></div>`).join('');
  const m={};rd.forEach(w=>{const k=(w.read||'').slice(0,7);if(/^\d{4}-\d\d$/.test(k))m[k]=(m[k]||0)+(w.words||0)});
- const ks=Object.keys(m).sort().slice(-12),mx=Math.max(1,...ks.map(k=>m[k]));
+ const k0=Object.keys(m).sort(),ks=[];if(k0.length){let y=+k0[0].slice(0,4),mn=+k0[0].slice(5);const end=k0[k0.length-1];for(;;){const k=y+'-'+String(mn).padStart(2,'0');m[k]=m[k]||0;ks.push(k);if(k>=end)break;if(++mn>12){mn=1;y++}}}const mx=Math.max(1,...ks.map(k=>m[k]));
  $('bars').innerHTML=ks.length?ks.map(k=>`<div class="bar" title="${k}: ${fmt(m[k])} words"><i style="height:${Math.max(2,m[k]/mx*80)}px"></i><small>${k.slice(2)}</small></div>`).join(''):'<span class="hint">Add read dates to see this chart.</span>';insights(D)}
 function openEdit(i){cur=i;const w=i==null?{}:W[i];$('et').textContent=i==null?'Add work':'Edit work';
  $('ef').innerHTML=F.map(([k,l,f])=>`<label class="${f||''}">${l}${k==='summary'||k==='notes'?`<textarea id="f_${k}" style="min-height:60px">${esc(w[k])}</textarea>`:`<input id="f_${k}" type="${k==='read'?'date':'text'}" value="${esc(w[k])}">`}</label>`).join('');
