@@ -30,7 +30,7 @@ button{cursor:pointer}button.pri{background:var(--ac);color:var(--acfg);border-c
 button.dng{color:var(--ac)}
 #search{flex:1;min-width:160px}
 .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--bd);border-radius:8px}
-table{border-collapse:collapse;width:100%;min-width:860px}
+table{border-collapse:collapse;width:100%;min-width:1050px}
 th,td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--bd)}
 th{font:600 12px system-ui,sans-serif;color:var(--mut);cursor:pointer;white-space:nowrap;background:var(--soft);user-select:none}
 tr:last-child td{border-bottom:0}
@@ -73,7 +73,7 @@ details{background:var(--card);border:1px solid var(--bd);border-radius:8px;marg
 </main>
 
 <dialog id="dp"><b>Paste from spreadsheet</b>
-<p class="hint">Copy cells including the header row and paste below. Recognized headers: link, title, author, summary, word_count, likes (or kudos), notes, read_date, fandom, rating, tags, status, chapters, hits. Without a header row, columns are assumed in the order link, title, author, summary, word_count, likes, notes, read_date.</p>
+<p class="hint">Copy cells including the header row and paste below. Recognized headers: link, title, author, summary, word_count, likes (or kudos), notes, read_date, fandom, language, rating, tags, status, chapters, hits, bookmarks, comments. Without a header row, columns are assumed in the order link, title, author, summary, word_count, likes, notes, read_date.</p>
 <textarea id="pt"></textarea>
 <div class="row"><button id="pc">Cancel</button><button class="pri" id="pg">Import</button></div></dialog>
 
@@ -86,9 +86,9 @@ details{background:var(--card);border:1px solid var(--bd);border-radius:8px;marg
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const K='ao3tracker.v1';
-const F=[['link','Link','f'],['title','Title','f'],['author','Author'],['fandom','Fandom'],['summary','Summary','f'],['words','Word count'],['likes','Likes / kudos'],['hits','Hits'],['chapters','Chapters'],['rating','Rating'],['tags','Tags (comma-separated)','f'],['status','Status'],['read','Read date'],['notes','Notes','f']];
-const NUM=['words','likes','hits'];
-const AL={link:['link','url','workurl','href'],title:['title','worktitle','name'],author:['author','authors','creator'],summary:['summary','description','blurb'],words:['wordcount','words','length'],likes:['likes','kudos'],notes:['notes','note','mynotes'],read:['readdate','read','dateread','dateadded'],fandom:['fandom','fandoms'],rating:['rating'],status:['status','complete'],chapters:['chapters'],hits:['hits'],tags:['tags','tag','freeforms','additionaltags','freeformtags']};
+const F=[['link','Link','f'],['title','Title','f'],['author','Author'],['fandom','Fandom'],['language','Language'],['summary','Summary','f'],['words','Word count'],['likes','Likes / kudos'],['hits','Hits'],['bookmarks','Bookmarks'],['comments','Comments'],['chapters','Chapters'],['rating','Rating'],['tags','Tags (comma-separated)','f'],['status','Status'],['read','Read date'],['notes','Notes','f']];
+const NUM=['words','likes','hits','bookmarks','comments'];
+const AL={link:['link','url','workurl','href'],title:['title','worktitle','name'],author:['author','authors','creator'],summary:['summary','description','blurb'],words:['wordcount','words','length'],likes:['likes','kudos'],notes:['notes','note','mynotes'],read:['readdate','read','dateread','dateadded'],fandom:['fandom','fandoms'],rating:['rating'],status:['status','complete'],chapters:['chapters'],hits:['hits'],tags:['tags','tag','freeforms','additionaltags','freeformtags'],language:['language','lang'],bookmarks:['bookmarks','bookmarkscount','bookmarkcount'],comments:['comments','commentscount','commentcount']};
 const DEF=['link','title','author','summary','words','likes','notes','read'];
 let W=[],sort={k:'read',d:-1},cur=null;
 const $=id=>document.getElementById(id);
@@ -106,8 +106,8 @@ function findW(r){const id=(r.link||'').match(/works\/(\d+)/);
 function num(v){if(v===''||v==null)return null;const n=parseFloat(String(v).replace(/[^\d.-]/g,''));return isNaN(n)?null:n}
 function nd(v){v=String(v||'').trim();if(!v)return '';const d=new Date(v);return isNaN(d)?v:(/^\d{4}-\d\d-\d\d$/.test(v)?v:d.toISOString().slice(0,10))}
 function snap(w){w.hist=w.hist||[];const l=w.hist[w.hist.length-1];
- if(l&&l.likes===w.likes&&l.words===w.words&&l.hits===w.hits)return false;
- const s={d:today(),likes:w.likes,words:w.words,hits:w.hits};
+ if(l&&l.likes===w.likes&&l.words===w.words&&l.hits===w.hits&&(l.bookmarks??null)===(w.bookmarks??null)&&(l.comments??null)===(w.comments??null))return false;
+ const s={d:today(),likes:w.likes,words:w.words,hits:w.hits,bookmarks:w.bookmarks,comments:w.comments};
  if(l&&l.d===s.d)w.hist[w.hist.length-1]=s;else w.hist.push(s);return true}
 function parse(t){const d=(t.split('\n')[0].match(/\t/g)||[]).length>(t.split('\n')[0].match(/,/g)||[]).length?'\t':',';
  const r=[];let row=[],f='',q=false;
@@ -160,11 +160,11 @@ function render(){
  let L=D.filter(w=>!q||[w.title,w.author,w.fandom,w.tags,w.notes,w.summary].join(' ').toLowerCase().includes(q));
  L.sort((x,y)=>{let a=x[sort.k],b=y[sort.k];const nu=NUM.includes(sort.k);if(a==null||a==='')return 1;if(b==null||b==='')return -1;
   return (nu?a-b:String(a).localeCompare(String(b)))*sort.d});
- const cols=[['title','Title'],['author','Author'],['summary','Summary'],['words','Words'],['likes','Likes'],['notes','Notes'],['read','Read']];
+ const cols=[['title','Title'],['author','Author'],['summary','Summary'],['words','Words'],['likes','Kudos'],['hits','Hits'],['bookmarks','Bookmarks'],['comments','Comments'],['notes','Notes'],['read','Read']];
  $('head').innerHTML=cols.map(([k,l])=>`<th data-k="${k}">${l}${sort.k===k?(sort.d>0?' ▲':' ▼'):''}</th>`).join('');
  $('body').innerHTML=L.length?L.map(w=>{const i=W.indexOf(w),h=w.hist||[],p=h.length>1?h[h.length-2]:null,dl=p&&w.likes!=null&&p.likes!=null&&w.likes!==p.likes?`<span class="d">${w.likes>p.likes?'+':''}${w.likes-p.likes}</span>`:'';
   const href=/^https?:\/\//i.test(w.link||'')?esc(w.link):'';
-  return `<tr data-i="${i}" style="cursor:pointer"><td>${href?`<a href="${href}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(w.title||href)}</a>`:esc(w.title)}<div class="sum">${esc([w.fandom,w.rating,w.status].filter(Boolean).join(' · '))}</div></td><td>${esc(w.author)}</td><td class="sum">${esc((w.summary||'').slice(0,160))}${(w.summary||'').length>160?'…':''}</td><td class="n">${fmt(w.words)}</td><td class="n">${fmt(w.likes)}${dl}</td><td class="sum">${esc(w.notes)}</td><td class="n">${esc(w.read)}${w.upd?`<div class="sum">upd ${esc(w.upd)}</div>`:''}</td></tr>`}).join(''):`<tr><td colspan="7" class="empty">${W.length?'No works match this date range or search.':'No works yet. Use Paste import, Import file, or + Add.'}</td></tr>`;
+  return `<tr data-i="${i}" style="cursor:pointer"><td>${href?`<a href="${href}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(w.title||href)}</a>`:esc(w.title)}<div class="sum">${esc([w.fandom,w.language,w.rating,w.status,w.chapters&&'Ch '+w.chapters].filter(Boolean).join(' · '))}</div></td><td>${esc(w.author)}</td><td class="sum">${esc((w.summary||'').slice(0,160))}${(w.summary||'').length>160?'…':''}</td><td class="n">${fmt(w.words)}</td><td class="n">${fmt(w.likes)}${dl}</td><td class="n">${fmt(w.hits)}</td><td class="n">${fmt(w.bookmarks)}</td><td class="n">${fmt(w.comments)}</td><td class="sum">${esc(w.notes)}</td><td class="n">${esc(w.read)}${w.upd?`<div class="sum">upd ${esc(w.upd)}</div>`:''}</td></tr>`}).join(''):`<tr><td colspan="10" class="empty">${W.length?'No works match this date range or search.':'No works yet. Use Paste import, Import file, or + Add.'}</td></tr>`;
  const rd=D.filter(w=>w.read),tw=rd.reduce((s,w)=>s+(w.words||0),0),au={};D.forEach(w=>{if(w.author)au[w.author]=(au[w.author]||0)+1});
  const top=Object.entries(au).sort((a,b)=>b[1]-a[1])[0],lk=D.filter(w=>w.likes!=null);
  $('cards').innerHTML=[[D.length,'Works in range'],[rd.length,'Read'],[fmt(tw),'Words read'],[lk.length?fmt(Math.round(lk.reduce((s,w)=>s+w.likes,0)/lk.length)):'—','Avg likes']].map(([v,l])=>`<div class="card"><b>${v}</b><span>${l}</span></div>`).join('');
@@ -174,7 +174,7 @@ function render(){
 function openEdit(i){cur=i;const w=i==null?{}:W[i];$('et').textContent=i==null?'Add work':'Edit work';
  $('ef').innerHTML=F.map(([k,l,f])=>`<label class="${f||''}">${l}${k==='summary'||k==='notes'?`<textarea id="f_${k}" style="min-height:60px">${esc(w[k])}</textarea>`:`<input id="f_${k}" type="${k==='read'?'date':'text'}" value="${esc(w[k])}">`}</label>`).join('');
  $('edel').style.display=i==null?'none':'';
- const h=w.hist||[];$('eh').innerHTML=h.length?`<b>Stat history</b>${spark(h)}<table style="min-width:0"><tr><th>Date</th><th>Likes</th><th>Words</th><th>Hits</th></tr>${h.slice().reverse().map(s=>`<tr><td>${s.d}</td><td>${fmt(s.likes)}</td><td>${fmt(s.words)}</td><td>${fmt(s.hits)}</td></tr>`).join('')}</table>`:'';
+ const h=w.hist||[];$('eh').innerHTML=h.length?`<b>Stat history</b>${spark(h)}<table style="min-width:0"><tr><th>Date</th><th>Likes</th><th>Words</th><th>Hits</th><th>Bookmarks</th><th>Comments</th></tr>${h.slice().reverse().map(s=>`<tr><td>${s.d}</td><td>${fmt(s.likes)}</td><td>${fmt(s.words)}</td><td>${fmt(s.hits)}</td><td>${fmt(s.bookmarks)}</td><td>${fmt(s.comments)}</td></tr>`).join('')}</table>`:'';
  $('de').showModal()}
 function spark(h){const v=h.map(s=>s.likes).filter(x=>x!=null);if(v.length<2)return '';const mn=Math.min(...v),mx=Math.max(...v),r=mx-mn||1;
  const p=v.map((y,i)=>`${(i/(v.length-1)*260+5).toFixed(1)},${(35-(y-mn)/r*30).toFixed(1)}`).join(' ');
@@ -202,7 +202,7 @@ $('fi').onchange=async e=>{const f=e.target.files[0];if(!f)return;
  else importText(await f.text())}catch(err){toast('Couldn’t read that file.')}
  e.target.value=''};
 $('exp').onclick=()=>dl('ao3-bookmarks-'+today()+'.csv',csvOut());
-$('tpl').onclick=()=>dl('ao3-template.csv',F.map(f=>f[0]).join(',')+'\nhttps://archiveofourown.org/works/123456,Example Title,Example Author,Example Fandom,"A short summary, with a comma",54000,1200,30000,12 of 12,Teen And Up,"Slow Burn, Angst",Complete,2026-01-15,Loved the slow burn\n');
+$('tpl').onclick=()=>dl('ao3-template.csv',F.map(f=>f[0]).join(',')+'\nhttps://archiveofourown.org/works/123456,Example Title,Example Author,Example Fandom,English,"A short summary, with a comma",54000,1200,30000,800,150,12 of 12,Teen And Up,"Slow Burn, Angst",Complete,2026-01-15,Loved the slow burn\n');
 load();render();
 </script>
 </body>
