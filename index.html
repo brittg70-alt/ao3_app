@@ -48,7 +48,7 @@ textarea{width:100%;min-height:180px;font-family:ui-monospace,monospace;font-siz
 .hint{font:12px system-ui,sans-serif;color:var(--mut);margin:6px 0}
 .hist{font:12px system-ui,sans-serif;margin-top:10px;max-height:130px;overflow:auto}
 .pc{display:block;margin-top:2px;font:600 11px system-ui,sans-serif;color:var(--mut)}.pc.up{color:#2e8b57}.pc.dn{color:#c0392b}
-details{background:var(--card);border:1px solid var(--bd);border-radius:8px;margin-bottom:8px}summary{cursor:pointer;padding:9px 12px;font:600 13px system-ui,sans-serif}details>div{padding:0 12px 12px}.ig{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.ig b{font:600 12px system-ui,sans-serif;color:var(--mut)}.mini{min-width:0;font:13px system-ui,sans-serif}.mini th{background:none;cursor:default}.mini td,.mini th{padding:4px 6px}.mini td.n{white-space:normal}
+details{background:var(--card);border:1px solid var(--bd);border-radius:8px;margin-bottom:8px}summary{cursor:pointer;padding:9px 12px;font:600 13px system-ui,sans-serif}details>div{padding:0 12px 12px;overflow-x:auto}.ig{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.ig b{font:600 12px system-ui,sans-serif;color:var(--mut)}.mini{min-width:0;font:13px system-ui,sans-serif}.mini th{background:none;cursor:default}.mini td,.mini th{padding:4px 6px}.mini td.n{white-space:normal}
 #toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:20px;font:13px system-ui,sans-serif;display:none;z-index:99}
 </style>
 </head>
@@ -57,6 +57,7 @@ details{background:var(--card);border:1px solid var(--bd);border-radius:8px;marg
 <h1>AO3 Bookmark Tracker</h1>
 <p class="sub">Import your bookmarks, then re-import or edit later to log how stats change over time.</p>
 <div class="cards" id="cards"></div>
+<div class="hint" id="cmp" style="margin:-4px 0 12px"></div>
 <div class="panel"><h2>Words read per month (year to date)</h2><div class="bars" id="bars"></div></div>
 <div id="ins"></div>
 <div class="tools">
@@ -74,7 +75,7 @@ details{background:var(--card);border:1px solid var(--bd);border-radius:8px;marg
 </main>
 
 <dialog id="dp"><b>Paste from spreadsheet</b>
-<p class="hint">Copy cells including the header row and paste below. Recognized headers: link, title, author, summary, word_count, kudos (or likes), notes, read_date, fandom, language, rating, tags, status, chapters, hits, bookmarks, comments. Without a header row, columns are assumed in the order link, title, author, summary, word_count, likes, notes, read_date.</p>
+<p class="hint">Copy cells including the header row and paste below. Recognized headers: link, title, author, summary, word_count, kudos (or likes), notes, read_date, fandom, language, rating, tags, status, chapters, hits, bookmarks, comments, bookmarked_date. Without a header row, columns are assumed in the order link, title, author, summary, word_count, likes, notes, read_date.</p>
 <textarea id="pt"></textarea>
 <div class="row"><button id="pc">Cancel</button><button class="pri" id="pg">Import</button></div></dialog>
 
@@ -87,9 +88,9 @@ details{background:var(--card);border:1px solid var(--bd);border-radius:8px;marg
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const K='ao3tracker.v1';
-const F=[['link','Link','f'],['title','Title','f'],['author','Author'],['fandom','Fandom'],['language','Language'],['summary','Summary','f'],['words','Word count'],['likes','Kudos'],['hits','Hits'],['bookmarks','Bookmarks'],['comments','Comments'],['chapters','Chapters'],['rating','Rating'],['tags','Tags (comma-separated)','f'],['status','Status'],['read','Read date'],['notes','Notes','f']];
+const F=[['link','Link','f'],['title','Title','f'],['author','Author'],['fandom','Fandom'],['language','Language'],['summary','Summary','f'],['words','Word count'],['likes','Kudos'],['hits','Hits'],['bookmarks','Bookmarks'],['comments','Comments'],['chapters','Chapters'],['rating','Rating'],['tags','Tags (comma-separated)','f'],['status','Status'],['read','Read date'],['bookmarked','Bookmarked date'],['notes','Notes','f']];
 const NUM=['words','likes','hits','bookmarks','comments'];
-const AL={link:['link','url','workurl','href'],title:['title','worktitle','name'],author:['author','authors','creator'],summary:['summary','description','blurb'],words:['wordcount','words','length'],likes:['likes','kudos'],notes:['notes','note','mynotes'],read:['readdate','read','dateread','dateadded'],fandom:['fandom','fandoms'],rating:['rating'],status:['status','complete'],chapters:['chapters','chaptercount','chapternumber','numberofchapters'],hits:['hits'],tags:['tags','tag','freeforms','additionaltags','freeformtags'],language:['language','lang'],bookmarks:['bookmarks','bookmarkscount','bookmarkcount'],comments:['comments','commentscount','commentcount']};
+const AL={link:['link','url','workurl','href'],title:['title','worktitle','name'],author:['author','authors','creator'],summary:['summary','description','blurb'],words:['wordcount','words','length'],likes:['likes','kudos'],notes:['notes','note','mynotes'],read:['readdate','read','dateread','dateadded'],fandom:['fandom','fandoms'],rating:['rating'],status:['status','complete'],chapters:['chapters','chaptercount','chapternumber','numberofchapters'],hits:['hits'],tags:['tags','tag','freeforms','additionaltags','freeformtags'],language:['language','lang'],bookmarks:['bookmarks','bookmarkscount','bookmarkcount'],comments:['comments','commentscount','commentcount'],bookmarked:['bookmarked','bookmarkeddate','bookmarkdate','datebookmarked','bookmarkedon']};
 const DEF=['link','title','author','summary','words','likes','notes','read'];
 let W=[],sort={k:'read',d:-1},cur=null;
 const $=id=>document.getElementById(id);
@@ -127,7 +128,7 @@ function importText(t){
  if(!map.includes('title')&&!map.includes('link')){map=DEF;data=rows}
  let a=0,u=0,c=0;
  data.forEach(r=>{const rec={};map.forEach((k,i)=>{if(k&&r[i]!=null&&r[i].trim()!=='')rec[k]=r[i].trim()});
-  NUM.forEach(k=>{if(k in rec)rec[k]=num(rec[k])});if(rec.read)rec.read=nd(rec.read);if(rec.chapters){const c=String(rec.chapters);let m;if(/^\d{4}-\d\d-\d\d$/.test(c)){const p=c.split('-');rec.chapters=(+p[1])+'/'+(+p[2])}else if(m=c.match(/^(\d{1,2})-([A-Za-z]{3})/)){const mi=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[2].toLowerCase())+1;if(mi)rec.chapters=mi+'/'+(+m[1])}}
+  NUM.forEach(k=>{if(k in rec)rec[k]=num(rec[k])});if(rec.read)rec.read=nd(rec.read);if(rec.bookmarked)rec.bookmarked=nd(rec.bookmarked);if(rec.chapters){const c=String(rec.chapters);let m;if(/^\d{4}-\d\d-\d\d$/.test(c)){const p=c.split('-');rec.chapters=(+p[1])+'/'+(+p[2])}else if(m=c.match(/^(\d{1,2})-([A-Za-z]{3})/)){const mi=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[2].toLowerCase())+1;if(mi)rec.chapters=mi+'/'+(+m[1])}}
   if(!rec.title&&!rec.link)return;
   const ex=findW(rec);
   if(ex){Object.assign(ex,rec);ex.upd=today();if(snap(ex))c++;u++}else{const w={title:'',author:'',summary:'',notes:'',read:'',words:null,likes:null,hits:null,...rec};snap(w);W.push(w);a++}});
@@ -155,13 +156,14 @@ function grp(L,fn){const g={};L.forEach(w=>fn(w).forEach(k=>{k=k.trim();if(!k)re
 function tbl(rows,h){return rows.length?`<table class="mini"><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map((c,i)=>`<td${i?' class="n"':''}>${c}</td>`).join('')}</tr>`).join('')}</table>`:'<span class="hint">Not enough data yet.</span>'}
 function insights(D){
  const op=[...document.querySelectorAll('#ins details[open]')].map(d=>d.dataset.k),top=(a,f,n=10)=>a.slice().sort(f).slice(0,n),N=x=>fmt(x),A=x=>x==null?'—':fmt(x);
+ const fdt={};let nb=0;W.forEach(w=>{const dt=w.bookmarked||w.read;if(!w.bookmarked&&w.read)nb++;if(!dt)return;sp(w.fandom).forEach(k=>{k=k.trim();if(!k)return;const o=fdt[k]=fdt[k]||[dt,dt];if(dt<o[0])o[0]=dt;if(dt>o[1])o[1]=dt})});
  const fd=grp(D,w=>sp(w.fandom)),tg=grp(D,w=>sp(w.tags)),au=grp(D,w=>[w.author||'']),cnt=(a,b)=>b.n-a.n||b.w-a.w,r3=o=>[esc(o.k),o.n,N(o.w),A(o.avg)];
  const best=top(tg.filter(o=>o.n>=2&&o.avg!=null),(a,b)=>b.avg-a.avg),rd=D.filter(w=>w.read&&w.words!=null),lg=top(rd,(a,b)=>b.words-a.words,1)[0],sh=top(rd,(a,b)=>a.words-b.words,1)[0];
  const mo={};D.forEach(w=>{const k=(w.read||'').slice(0,7);if(k)mo[k]=(mo[k]||0)+1});const bm=Object.entries(mo).sort((a,b)=>b[1]-a[1])[0];
  const tw=D.reduce((s,w)=>s+(w.words||0),0),wn=D.filter(w=>w.words!=null).length;
  const bk=[['Under 10k',0,1e4],['10k–50k',1e4,5e4],['50k–100k',5e4,1e5],['100k+',1e5,1e12]].map(([l,a,b])=>[l,D.filter(w=>w.words!=null&&w.words>=a&&w.words<b).length]);
  const S=[
- ['fandom','Fandoms',tbl(top(fd,cnt).map(r3),['Fandom','Works','Words','Avg kudos'])],
+ ['fandom','Fandoms',tbl(top(fd,cnt).map(o=>r3(o).concat([fdt[o.k]?fdt[o.k][0]:'—',fdt[o.k]?fdt[o.k][1]:'—'])),['Fandom','Works','Words','Avg kudos','First bookmarked','Last bookmarked'])+`<p class="hint">First/last dates span all your works, not just the date range.${nb?' '+nb+' work'+(nb>1?'s':'')+' without a bookmarked date use the read date.':''}</p>`],
  ['tags','Tags',`<div class="ig"><div><b>Most read</b>${tbl(top(tg,cnt).map(o=>[esc(o.k),o.n,A(o.avg)]),['Tag','Works','Avg kudos'])}</div><div><b>Highest avg kudos (2+ works)</b>${tbl(best.map(o=>[esc(o.k),o.n,A(o.avg)]),['Tag','Works','Avg kudos'])}</div></div>`],
  ['auth','Authors',tbl(top(au,cnt).map(r3),['Author','Works','Words','Avg kudos'])],
  ['pace','Reading pace',tbl([['Works',D.length],['Total words',N(tw)],['Average length',wn?N(Math.round(tw/wn)):'—'],['Avg words per chapter',wpc(D)==null?'—':N(wpc(D))],['Longest',lg?esc(lg.title)+' ('+N(lg.words)+')':'—'],['Shortest',sh?esc(sh.title)+' ('+N(sh.words)+')':'—'],['Busiest month',bm?bm[0]+' ('+bm[1]+' works)':'—']],['Stat','Value'])],
@@ -181,12 +183,12 @@ function render(){
  const rd=D.filter(w=>w.read),tw=rd.reduce((s,w)=>s+(w.words||0),0),au={};D.forEach(w=>{if(w.author)au[w.author]=(au[w.author]||0)+1});
  const top=Object.entries(au).sort((a,b)=>b[1]-a[1])[0],lk=D.filter(w=>w.likes!=null);
  const pr=prior(),P=pr?mets(W.filter(w=>w.read&&w.read>=pr[0]&&w.read<=pr[1])):null,M=mets(D),dd=k=>P?pct(M[k],P[k],pr[2]):'';
- $('cards').innerHTML=[[D.length,'Works in range'],[rd.length,'Read',dd('n')],[fmt(tw),'Words read',dd('w')],[lk.length?fmt(Math.round(lk.reduce((s,w)=>s+w.likes,0)/lk.length)):'—','Avg kudos',dd('k')],[wpc(D)==null?'—':fmt(wpc(D)),'Avg words / chapter',dd('c')]].map(([v,l,d])=>`<div class="card"><b>${v}</b><span>${l}</span>${d||''}</div>`).join('')+(pr?`<div class="hint" style="grid-column:1/-1;margin:0">▲▼ compared with ${pr[2]} (${pr[0]} to ${pr[1]})</div>`:'');
+ $('cards').innerHTML=[[D.length,'Works in range'],[rd.length,'Read',dd('n')],[fmt(tw),'Words read',dd('w')],[lk.length?fmt(Math.round(lk.reduce((s,w)=>s+w.likes,0)/lk.length)):'—','Avg kudos',dd('k')],[wpc(D)==null?'—':fmt(wpc(D)),'Avg words / chapter',dd('c')]].map(([v,l,d])=>`<div class="card"><b>${v}</b><span>${l}</span>${d||''}</div>`).join('');$('cmp').textContent=pr?`▲▼ compared with ${pr[2]} (${pr[0]} to ${pr[1]})`:'';
  const m={};W.forEach(w=>{const k=(w.read||'').slice(0,7);if(/^\d{4}-\d\d$/.test(k))m[k]=(m[k]||0)+(w.words||0)});
  const yr=new Date().getFullYear(),ks=[];for(let i=1;i<=new Date().getMonth()+1;i++){const k=yr+'-'+String(i).padStart(2,'0');m[k]=m[k]||0;ks.push(k)}const mx=Math.max(1,...ks.map(k=>m[k]));
  $('bars').innerHTML=ks.length?ks.map(k=>`<div class="bar" title="${k}: ${fmt(m[k])} words"><i style="height:${Math.max(2,m[k]/mx*80)}px"></i><small>${k.slice(2)}</small></div>`).join(''):'<span class="hint">Add read dates to see this chart.</span>';insights(D)}
 function openEdit(i){cur=i;const w=i==null?{}:W[i];$('et').textContent=i==null?'Add work':'Edit work';
- $('ef').innerHTML=F.map(([k,l,f])=>`<label class="${f||''}">${l}${k==='summary'||k==='notes'?`<textarea id="f_${k}" style="min-height:60px">${esc(w[k])}</textarea>`:`<input id="f_${k}" type="${k==='read'?'date':'text'}" value="${esc(w[k])}">`}</label>`).join('');
+ $('ef').innerHTML=F.map(([k,l,f])=>`<label class="${f||''}">${l}${k==='summary'||k==='notes'?`<textarea id="f_${k}" style="min-height:60px">${esc(w[k])}</textarea>`:`<input id="f_${k}" type="${k==='read'||k==='bookmarked'?'date':'text'}" value="${esc(w[k])}">`}</label>`).join('');
  $('edel').style.display=i==null?'none':'';
  const h=w.hist||[];$('eh').innerHTML=h.length?`<b>Stat history</b>${spark(h)}<table style="min-width:0"><tr><th>Date</th><th>Kudos</th><th>Words</th><th>Hits</th><th>Bookmarks</th><th>Comments</th></tr>${h.slice().reverse().map(s=>`<tr><td>${s.d}</td><td>${fmt(s.likes)}</td><td>${fmt(s.words)}</td><td>${fmt(s.hits)}</td><td>${fmt(s.bookmarks)}</td><td>${fmt(s.comments)}</td></tr>`).join('')}</table>`:'';
  $('de').showModal()}
@@ -216,7 +218,7 @@ $('fi').onchange=async e=>{const f=e.target.files[0];if(!f)return;
  else importText(await f.text())}catch(err){toast('Couldn’t read that file.')}
  e.target.value=''};
 $('exp').onclick=()=>dl('ao3-bookmarks-'+today()+'.csv',csvOut());
-$('tpl').onclick=()=>dl('ao3-template.csv',F.map(f=>f[0]==='likes'?'kudos':f[0]).join(',')+'\nhttps://archiveofourown.org/works/123456,Example Title,Example Author,Example Fandom,English,"A short summary, with a comma",54000,1200,30000,800,150,12 of 12,Teen And Up,"Slow Burn, Angst",Complete,2026-01-15,Loved the slow burn\n');
+$('tpl').onclick=()=>dl('ao3-template.csv',F.map(f=>f[0]==='likes'?'kudos':f[0]).join(',')+'\nhttps://archiveofourown.org/works/123456,Example Title,Example Author,Example Fandom,English,"A short summary, with a comma",54000,1200,30000,800,150,12 of 12,Teen And Up,"Slow Burn, Angst",Complete,2026-01-15,2025-12-01,Loved the slow burn\n');
 load();render();
 </script>
 </body>
