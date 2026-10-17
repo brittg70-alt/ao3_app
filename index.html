@@ -56,7 +56,7 @@ details{background:var(--card);border:1px solid var(--bd);border-radius:8px;marg
 <h1>AO3 Bookmark Tracker</h1>
 <p class="sub">Import your bookmarks, then re-import or edit later to log how stats change over time.</p>
 <div class="cards" id="cards"></div>
-<div class="panel"><h2>Words read per month</h2><div class="bars" id="bars"></div></div>
+<div class="panel"><h2>Words read per month (year to date)</h2><div class="bars" id="bars"></div></div>
 <div id="ins"></div>
 <div class="tools">
 <input id="search" type="search" placeholder="Search title, author, fandom, notes…">
@@ -168,8 +168,8 @@ function render(){
  const rd=D.filter(w=>w.read),tw=rd.reduce((s,w)=>s+(w.words||0),0),au={};D.forEach(w=>{if(w.author)au[w.author]=(au[w.author]||0)+1});
  const top=Object.entries(au).sort((a,b)=>b[1]-a[1])[0],lk=D.filter(w=>w.likes!=null);
  $('cards').innerHTML=[[D.length,'Works in range'],[rd.length,'Read'],[fmt(tw),'Words read'],[lk.length?fmt(Math.round(lk.reduce((s,w)=>s+w.likes,0)/lk.length)):'—','Avg likes']].map(([v,l])=>`<div class="card"><b>${v}</b><span>${l}</span></div>`).join('');
- const m={};rd.forEach(w=>{const k=(w.read||'').slice(0,7);if(/^\d{4}-\d\d$/.test(k))m[k]=(m[k]||0)+(w.words||0)});
- const k0=Object.keys(m).sort(),ks=[];if(k0.length){let y=+k0[0].slice(0,4),mn=+k0[0].slice(5);const end=k0[k0.length-1];for(;;){const k=y+'-'+String(mn).padStart(2,'0');m[k]=m[k]||0;ks.push(k);if(k>=end)break;if(++mn>12){mn=1;y++}}}const mx=Math.max(1,...ks.map(k=>m[k]));
+ const m={};W.forEach(w=>{const k=(w.read||'').slice(0,7);if(/^\d{4}-\d\d$/.test(k))m[k]=(m[k]||0)+(w.words||0)});
+ const yr=new Date().getFullYear(),ks=[];for(let i=1;i<=new Date().getMonth()+1;i++){const k=yr+'-'+String(i).padStart(2,'0');m[k]=m[k]||0;ks.push(k)}const mx=Math.max(1,...ks.map(k=>m[k]));
  $('bars').innerHTML=ks.length?ks.map(k=>`<div class="bar" title="${k}: ${fmt(m[k])} words"><i style="height:${Math.max(2,m[k]/mx*80)}px"></i><small>${k.slice(2)}</small></div>`).join(''):'<span class="hint">Add read dates to see this chart.</span>';insights(D)}
 function openEdit(i){cur=i;const w=i==null?{}:W[i];$('et').textContent=i==null?'Add work':'Edit work';
  $('ef').innerHTML=F.map(([k,l,f])=>`<label class="${f||''}">${l}${k==='summary'||k==='notes'?`<textarea id="f_${k}" style="min-height:60px">${esc(w[k])}</textarea>`:`<input id="f_${k}" type="${k==='read'?'date':'text'}" value="${esc(w[k])}">`}</label>`).join('');
