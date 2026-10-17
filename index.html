@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AO3 Bookmark Tracker</title>
+<style>
+:root{--bg:#faf7f5;--card:#fff;--fg:#2a2220;--mut:#7a6d68;--bd:#e6dcd7;--ac:#990000;--acfg:#fff;--soft:#f3ebe7;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1b1615;--card:#252020;--fg:#efe7e3;--mut:#a89a94;--bd:#3a3231;--ac:#e0605a;--acfg:#1b1615;--soft:#2f2827}}
+:root[data-theme="dark"]{--bg:#1b1615;--card:#252020;--fg:#efe7e3;--mut:#a89a94;--bd:#3a3231;--ac:#e0605a;--acfg:#1b1615;--soft:#2f2827}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 Georgia,"Times New Roman",serif}
+main{max-width:1150px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:26px;margin:0 0 2px;color:var(--ac)}
+.sub{color:var(--mut);margin:0 0 18px;font-size:14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:10px 12px}
+.card b{display:block;font-size:22px}.card span{color:var(--mut);font-size:12px;font-family:system-ui,sans-serif}
+.panel{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:14px}
+.panel h2{font:600 13px system-ui,sans-serif;color:var(--mut);margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em}
+.bars{display:flex;align-items:flex-end;gap:6px;height:110px}
+.bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0}
+.bar i{display:block;width:100%;background:var(--ac);border-radius:3px 3px 0 0;min-height:2px}
+.bar small{font:10px system-ui,sans-serif;color:var(--mut);margin-top:3px;white-space:nowrap}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center}
+input,select,textarea,button{font:14px system-ui,sans-serif;color:var(--fg);background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:7px 10px}
+button{cursor:pointer}button.pri{background:var(--ac);color:var(--acfg);border-color:var(--ac)}
+button.dng{color:var(--ac)}
+#search{flex:1;min-width:160px}
+.wrap{overflow-x:auto;background:var(--card);border:1px solid var(--bd);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:860px}
+th,td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--bd)}
+th{font:600 12px system-ui,sans-serif;color:var(--mut);cursor:pointer;white-space:nowrap;background:var(--soft);user-select:none}
+tr:last-child td{border-bottom:0}
+td.n{text-align:right;white-space:nowrap}
+td a{color:var(--ac);font-weight:600;text-decoration:none}td a:hover{text-decoration:underline}
+.sum{color:var(--mut);font-size:13px;max-width:320px}
+.d{color:#2e8b57;font:11px system-ui,sans-serif;margin-left:4px}
+.empty{padding:30px;text-align:center;color:var(--mut)}
+dialog{background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:10px;width:min(620px,94vw);padding:16px}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g label{display:flex;flex-direction:column;font:12px system-ui,sans-serif;color:var(--mut);gap:3px}
+.g .f{grid-column:1/-1}
+textarea{width:100%;min-height:180px;font-family:ui-monospace,monospace;font-size:12px}
+.row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+.hint{font:12px system-ui,sans-serif;color:var(--mut);margin:6px 0}
+.hist{font:12px system-ui,sans-serif;margin-top:10px;max-height:130px;overflow:auto}
+#toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:20px;font:13px system-ui,sans-serif;display:none;z-index:99}
+</style>
+</head>
+<body>
+<main>
+<h1>AO3 Bookmark Tracker</h1>
+<p class="sub">Import your bookmarks, then re-import or edit later to log how stats change over time.</p>
+<div class="cards" id="cards"></div>
+<div class="panel"><h2>Words read per month</h2><div class="bars" id="bars"></div></div>
+<div class="tools">
+<input id="search" type="search" placeholder="Search title, author, fandom, notes…">
+<select id="flt"><option value="all">All</option><option value="read">Read</option><option value="unread">No read date</option></select>
+<button class="pri" id="add">+ Add</button>
+<button id="paste">Paste import</button>
+<button id="file">Import file</button>
+<button id="exp">Export CSV</button>
+<button id="tpl">Template</button>
+<input id="fi" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls" hidden>
+</div>
+<div class="wrap"><table><thead><tr id="head"></tr></thead><tbody id="body"></tbody></table></div>
+<p class="hint">Data is saved in this browser only (private to you). Use Export CSV for backups. AO3 can’t be queried from this page, so to refresh stats, update a row or re-import a newer spreadsheet; matching works (by link) get a new dated snapshot.</p>
+</main>
+
+<dialog id="dp"><b>Paste from spreadsheet</b>
+<p class="hint">Copy cells including the header row and paste below. Recognized headers: link, title, author, summary, word_count, likes (or kudos), notes, read_date, fandom, rating, status, chapters, hits. Without a header row, columns are assumed in the order link, title, author, summary, word_count, likes, notes, read_date.</p>
+<textarea id="pt"></textarea>
+<div class="row"><button id="pc">Cancel</button><button class="pri" id="pg">Import</button></div></dialog>
+
+<dialog id="de"><b id="et">Edit</b>
+<div class="g" id="ef"></div>
+<div class="hist" id="eh"></div>
+<div class="row"><button class="dng" id="edel">Delete</button><button id="ec">Cancel</button><button class="pri" id="es">Save</button></div></dialog>
+
+<div id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const K='ao3tracker.v1';
+const F=[['link','Link','f'],['title','Title','f'],['author','Author'],['fandom','Fandom'],['summary','Summary','f'],['words','Word count'],['likes','Likes / kudos'],['hits','Hits'],['chapters','Chapters'],['rating','Rating'],['status','Status'],['read','Read date'],['notes','Notes','f']];
+const NUM=['words','likes','hits'];
+const AL={link:['link','url','workurl','href'],title:['title','worktitle','name'],author:['author','authors','creator'],summary:['summary','description','blurb'],words:['wordcount','words','length'],likes:['likes','kudos'],notes:['notes','note','mynotes'],read:['readdate','read','dateread','dateadded'],fandom:['fandom','fandoms'],rating:['rating'],status:['status','complete'],chapters:['chapters'],hits:['hits']};
+const DEF=['link','title','author','summary','words','likes','notes','read'];
+let W=[],sort={k:'read',d:-1},cur=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const today=()=>new Date().toISOString().slice(0,10);
+const fmt=n=>n==null?'—':Number(n).toLocaleString();
+function load(){try{W=JSON.parse(localStorage.getItem(K)||'[]')}catch(e){W=[]}}
+function save(){try{localStorage.setItem(K,JSON.stringify(W))}catch(e){toast('Couldn’t save to browser storage. Export a backup.')}}
+function toast(t){const e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',3500)}
+function keyOf(w){const m=(w.link||'').match(/works\/(\d+)/);return m?m[1]:((w.title||'')+'|'+(w.author||'')).toLowerCase()}
+function num(v){if(v===''||v==null)return null;const n=parseFloat(String(v).replace(/[^\d.-]/g,''));return isNaN(n)?null:n}
+function nd(v){v=String(v||'').trim();if(!v)return '';const d=new Date(v);return isNaN(d)?v:(/^\d{4}-\d\d-\d\d$/.test(v)?v:d.toISOString().slice(0,10))}
+function snap(w){w.hist=w.hist||[];const l=w.hist[w.hist.length-1];
+ if(l&&l.likes===w.likes&&l.words===w.words&&l.hits===w.hits)return;
+ const s={d:today(),likes:w.likes,words:w.words,hits:w.hits};
+ if(l&&l.d===s.d)w.hist[w.hist.length-1]=s;else w.hist.push(s)}
+function parse(t){const d=(t.split('\n')[0].match(/\t/g)||[]).length>(t.split('\n')[0].match(/,/g)||[]).length?'\t':',';
+ const r=[];let row=[],f='',q=false;
+ for(let i=0;i<t.length;i++){const c=t[i];
+  if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+  else if(c==='"'&&f==='')q=true;
+  else if(c===d){row.push(f);f=''}
+  else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;row.push(f);f='';if(row.some(x=>x.trim()))r.push(row);row=[]}
+  else f+=c}
+ row.push(f);if(row.some(x=>x.trim()))r.push(row);return r}
+function importText(t){
+ const rows=parse(t.replace(/^\uFEFF/,''));if(!rows.length){toast('Nothing to import.');return}
+ const norm=s=>s.toLowerCase().replace(/[^a-z0-9]/g,'');
+ let map=rows[0].map(h=>{h=norm(h);return Object.keys(AL).find(k=>AL[k].includes(h))||null});
+ let data=rows.slice(1);
+ if(!map.includes('title')&&!map.includes('link')){map=DEF;data=rows}
+ let a=0,u=0;
+ data.forEach(r=>{const rec={};map.forEach((k,i)=>{if(k&&r[i]!=null&&r[i].trim()!=='')rec[k]=r[i].trim()});
+  NUM.forEach(k=>{if(k in rec)rec[k]=num(rec[k])});if(rec.read)rec.read=nd(rec.read);if(rec.chapters&&/^\d+$/.test(rec.chapters)===false)rec.chapters=rec.chapters;
+  if(!rec.title&&!rec.link)return;
+  const k=keyOf(rec),ex=W.find(w=>keyOf(w)===k);
+  if(ex){Object.assign(ex,rec);snap(ex);u++}else{const w={title:'',author:'',summary:'',notes:'',read:'',words:null,likes:null,hits:null,...rec};snap(w);W.push(w);a++}});
+ save();render();toast(`Imported: ${a} new, ${u} updated.`)}
+function render(){
+ const q=$('search').value.toLowerCase(),fl=$('flt').value;
+ let L=W.filter(w=>(fl==='all'||(fl==='read')===!!w.read)&&(!q||[w.title,w.author,w.fandom,w.notes,w.summary].join(' ').toLowerCase().includes(q)));
+ L.sort((x,y)=>{let a=x[sort.k],b=y[sort.k];const nu=NUM.includes(sort.k);if(a==null||a==='')return 1;if(b==null||b==='')return -1;
+  return (nu?a-b:String(a).localeCompare(String(b)))*sort.d});
+ const cols=[['title','Title'],['author','Author'],['summary','Summary'],['words','Words'],['likes','Likes'],['notes','Notes'],['read','Read']];
+ $('head').innerHTML=cols.map(([k,l])=>`<th data-k="${k}">${l}${sort.k===k?(sort.d>0?' ▲':' ▼'):''}</th>`).join('');
+ $('body').innerHTML=L.length?L.map(w=>{const i=W.indexOf(w),h=w.hist||[],p=h.length>1?h[h.length-2]:null,dl=p&&w.likes!=null&&p.likes!=null&&w.likes!==p.likes?`<span class="d">${w.likes>p.likes?'+':''}${w.likes-p.likes}</span>`:'';
+  const href=/^https?:\/\//i.test(w.link||'')?esc(w.link):'';
+  return `<tr data-i="${i}" style="cursor:pointer"><td>${href?`<a href="${href}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(w.title||href)}</a>`:esc(w.title)}<div class="sum">${esc([w.fandom,w.rating,w.status].filter(Boolean).join(' · '))}</div></td><td>${esc(w.author)}</td><td class="sum">${esc((w.summary||'').slice(0,160))}${(w.summary||'').length>160?'…':''}</td><td class="n">${fmt(w.words)}</td><td class="n">${fmt(w.likes)}${dl}</td><td class="sum">${esc(w.notes)}</td><td class="n">${esc(w.read)}</td></tr>`}).join(''):`<tr><td colspan="7" class="empty">${W.length?'No matches.':'No works yet. Use Paste import, Import file, or + Add.'}</td></tr>`;
+ const rd=W.filter(w=>w.read),tw=rd.reduce((s,w)=>s+(w.words||0),0),au={};W.forEach(w=>{if(w.author)au[w.author]=(au[w.author]||0)+1});
+ const top=Object.entries(au).sort((a,b)=>b[1]-a[1])[0],lk=W.filter(w=>w.likes!=null);
+ $('cards').innerHTML=[[W.length,'Works tracked'],[rd.length,'Read'],[fmt(tw),'Words read'],[lk.length?fmt(Math.round(lk.reduce((s,w)=>s+w.likes,0)/lk.length)):'—','Avg likes'],[top?esc(top[0])+' ('+top[1]+')':'—','Most-bookmarked author']].map(([v,l])=>`<div class="card"><b>${v}</b><span>${l}</span></div>`).join('');
+ const m={};rd.forEach(w=>{const k=(w.read||'').slice(0,7);if(/^\d{4}-\d\d$/.test(k))m[k]=(m[k]||0)+(w.words||0)});
+ const ks=Object.keys(m).sort().slice(-12),mx=Math.max(1,...ks.map(k=>m[k]));
+ $('bars').innerHTML=ks.length?ks.map(k=>`<div class="bar" title="${k}: ${fmt(m[k])} words"><i style="height:${Math.max(2,m[k]/mx*80)}px"></i><small>${k.slice(2)}</small></div>`).join(''):'<span class="hint">Add read dates to see this chart.</span>'}
+function openEdit(i){cur=i;const w=i==null?{}:W[i];$('et').textContent=i==null?'Add work':'Edit work';
+ $('ef').innerHTML=F.map(([k,l,f])=>`<label class="${f||''}">${l}${k==='summary'||k==='notes'?`<textarea id="f_${k}" style="min-height:60px">${esc(w[k])}</textarea>`:`<input id="f_${k}" type="${k==='read'?'date':'text'}" value="${esc(w[k])}">`}</label>`).join('');
+ $('edel').style.display=i==null?'none':'';
+ const h=w.hist||[];$('eh').innerHTML=h.length?`<b>Stat history</b>${spark(h)}<table style="min-width:0"><tr><th>Date</th><th>Likes</th><th>Words</th><th>Hits</th></tr>${h.slice().reverse().map(s=>`<tr><td>${s.d}</td><td>${fmt(s.likes)}</td><td>${fmt(s.words)}</td><td>${fmt(s.hits)}</td></tr>`).join('')}</table>`:'';
+ $('de').showModal()}
+function spark(h){const v=h.map(s=>s.likes).filter(x=>x!=null);if(v.length<2)return '';const mn=Math.min(...v),mx=Math.max(...v),r=mx-mn||1;
+ const p=v.map((y,i)=>`${(i/(v.length-1)*260+5).toFixed(1)},${(35-(y-mn)/r*30).toFixed(1)}`).join(' ');
+ return `<svg viewBox="0 0 270 40" width="270" height="40" style="display:block;margin:6px 0"><polyline points="${p}" fill="none" stroke="var(--ac)" stroke-width="2"/></svg>`}
+function saveEdit(){const w=cur==null?{}:W[cur];
+ F.forEach(([k])=>{let v=$('f_'+k).value.trim();if(NUM.includes(k))v=num(v);w[k]=v});
+ if(!w.title&&!w.link){toast('Add a title or link.');return}
+ snap(w);if(cur==null)W.push(w);save();$('de').close();render()}
+function csvOut(){const c=F.map(f=>f[0]);const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+ return [c.join(',')].concat(W.map(w=>c.map(k=>q(w[k])).join(','))).join('\n')}
+function dl(name,txt){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/csv'}));a.download=name;document.body.appendChild(a);a.click();a.remove()}
+$('head').onclick=e=>{const k=e.target.dataset.k;if(!k)return;sort=sort.k===k?{k,d:-sort.d}:{k,d:NUM.includes(k)||k==='read'?-1:1};render()};
+$('body').onclick=e=>{const tr=e.target.closest('tr[data-i]');if(tr)openEdit(+tr.dataset.i)};
+$('search').oninput=render;$('flt').onchange=render;
+$('add').onclick=()=>openEdit(null);
+$('paste').onclick=()=>{$('pt').value='';$('dp').showModal()};
+$('pc').onclick=()=>$('dp').close();
+$('pg').onclick=()=>{importText($('pt').value);$('dp').close()};
+$('ec').onclick=()=>$('de').close();$('es').onclick=saveEdit;
+$('edel').onclick=()=>{if(confirm('Delete this work?')){W.splice(cur,1);save();$('de').close();render()}};
+$('file').onclick=()=>$('fi').click();
+$('fi').onchange=async e=>{const f=e.target.files[0];if(!f)return;
+ try{if(/\.xlsx?$/i.test(f.name)){if(typeof XLSX==='undefined'){toast('Excel reader didn’t load. Save as CSV or use Paste import.');return}
+  const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});importText(XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]],{dateNF:'yyyy-mm-dd'}))}
+ else importText(await f.text())}catch(err){toast('Couldn’t read that file.')}
+ e.target.value=''};
+$('exp').onclick=()=>dl('ao3-bookmarks-'+today()+'.csv',csvOut());
+$('tpl').onclick=()=>dl('ao3-template.csv',F.map(f=>f[0]).join(',')+'\nhttps://archiveofourown.org/works/123456,Example Title,Example Author,Example Fandom,"A short summary, with a comma",54000,1200,30000,12 of 12,Teen And Up,Complete,2026-01-15,Loved the slow burn\n');
+load();render();
+</script>
+</body>
+</html>
