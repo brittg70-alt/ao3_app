@@ -30,7 +30,7 @@ button{cursor:pointer}button.pri{background:var(--ac);color:var(--acfg);border-c
 button.dng{color:var(--ac)}
 #search{flex:1;min-width:160px}
 .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--bd);border-radius:8px}
-table{border-collapse:collapse;width:100%;min-width:1050px}
+table{border-collapse:collapse;width:100%;min-width:1150px}
 th,td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--bd)}
 th{font:600 12px system-ui,sans-serif;color:var(--mut);cursor:pointer;white-space:nowrap;background:var(--soft);user-select:none}
 tr:last-child td{border-bottom:0}
@@ -70,6 +70,7 @@ details{background:var(--card);border:1px solid var(--bd);border-radius:8px;marg
 <button id="tpl">Template</button>
 <input id="fi" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls" hidden>
 </div>
+<div class="hint" id="rep"></div>
 <div class="wrap"><table><thead><tr id="head"></tr></thead><tbody id="body"></tbody></table></div>
 <p class="hint">Data is saved in this browser only (private to you). Use Export CSV for backups. AO3 can’t be queried from this page, so to refresh stats, update a row or re-import a newer spreadsheet; matching works (by link) get a new dated snapshot.</p>
 </main>
@@ -123,15 +124,16 @@ function parse(t){const d=(t.split('\n')[0].match(/\t/g)||[]).length>(t.split('\
 function importText(t){
  const rows=parse(t.replace(/^\uFEFF/,''));if(!rows.length){toast('Nothing to import.');return}
  const norm=s=>s.toLowerCase().replace(/[^a-z0-9]/g,'');
- let map=rows[0].map(h=>{h=norm(h);return Object.keys(AL).find(k=>AL[k].includes(h))||null});
- let data=rows.slice(1);
- if(!map.includes('title')&&!map.includes('link')){map=DEF;data=rows}
+ let map=rows[0].map(h=>{h=norm(h);return Object.keys(AL).find(k=>AL[k].includes(h))||(h.includes('chapter')?'chapters':h.includes('kudo')?'likes':null)});
+ let data=rows.slice(1),hasH=true;
+ if(!map.includes('title')&&!map.includes('link')){map=DEF;data=rows;hasH=false}
  let a=0,u=0,c=0;
  data.forEach(r=>{const rec={};map.forEach((k,i)=>{if(k&&r[i]!=null&&r[i].trim()!=='')rec[k]=r[i].trim()});
   NUM.forEach(k=>{if(k in rec)rec[k]=num(rec[k])});if(rec.read)rec.read=nd(rec.read);if(rec.bookmarked)rec.bookmarked=nd(rec.bookmarked);if(rec.chapters){const c=String(rec.chapters);let m;if(/^\d{4}-\d\d-\d\d$/.test(c)){const p=c.split('-');rec.chapters=(+p[1])+'/'+(+p[2])}else if(m=c.match(/^(\d{1,2})-([A-Za-z]{3})/)){const mi=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[2].toLowerCase())+1;if(mi)rec.chapters=mi+'/'+(+m[1])}}
   if(!rec.title&&!rec.link)return;
   const ex=findW(rec);
   if(ex){Object.assign(ex,rec);ex.upd=today();if(snap(ex))c++;u++}else{const w={title:'',author:'',summary:'',notes:'',read:'',words:null,likes:null,hits:null,...rec};snap(w);W.push(w);a++}});
+ {const nm=hasH?rows[0].filter((h,i)=>!map[i]).map(h=>h.trim()).filter(Boolean):[],nc=W.filter(w=>chn(w)>0).length;$('rep').textContent=(hasH?'Columns imported: '+rows[0].filter((h,i)=>map[i]).map(h=>h.trim()).join(', ')+'. ':'No header row found, so default column order was assumed. ')+(nm.length?'Ignored (not recognized): '+nm.join(', ')+'. ':'')+nc+' of '+W.length+' works now have chapters.'}
  save();render();toast(`Imported: ${a} new, ${u} matched existing works and were updated (${c} had changed stats).${W.some(w=>!inRange(w))?' Some works are outside the current date filter.':''}`)}
 const isod=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 function prior(){const v=$('flt').value,t=new Date(),y=t.getFullYear();
@@ -173,13 +175,13 @@ function render(){
  const q=$('search').value.toLowerCase(),fl=$('flt').value;
  const D=W.filter(inRange);
  let L=D.filter(w=>!q||[w.title,w.author,w.fandom,w.tags,w.notes,w.summary].join(' ').toLowerCase().includes(q));
- L.sort((x,y)=>{let a=x[sort.k],b=y[sort.k];const nu=NUM.includes(sort.k);if(a==null||a==='')return 1;if(b==null||b==='')return -1;
+ L.sort((x,y)=>{let a=sort.k==='chapters'?chn(x):x[sort.k],b=sort.k==='chapters'?chn(y):y[sort.k];const nu=NUM.includes(sort.k)||sort.k==='chapters';if(a==null||a==='')return 1;if(b==null||b==='')return -1;
   return (nu?a-b:String(a).localeCompare(String(b)))*sort.d});
- const cols=[['title','Title'],['author','Author'],['summary','Summary'],['words','Words'],['likes','Kudos'],['hits','Hits'],['bookmarks','Bookmarks'],['comments','Comments'],['notes','Notes'],['read','Read']];
+ const cols=[['title','Title'],['author','Author'],['summary','Summary'],['words','Words'],['chapters','Chapters'],['likes','Kudos'],['hits','Hits'],['bookmarks','Bookmarks'],['comments','Comments'],['notes','Notes'],['read','Read']];
  $('head').innerHTML=cols.map(([k,l])=>`<th data-k="${k}">${l}${sort.k===k?(sort.d>0?' ▲':' ▼'):''}</th>`).join('');
  $('body').innerHTML=L.length?L.map(w=>{const i=W.indexOf(w),h=w.hist||[],p=h.length>1?h[h.length-2]:null,dl=p&&w.likes!=null&&p.likes!=null&&w.likes!==p.likes?`<span class="d">${w.likes>p.likes?'+':''}${w.likes-p.likes}</span>`:'';
   const href=/^https?:\/\//i.test(w.link||'')?esc(w.link):'';
-  return `<tr data-i="${i}" style="cursor:pointer"><td>${href?`<a href="${href}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(w.title||href)}</a>`:esc(w.title)}<div class="sum">${esc([w.fandom,w.language,w.rating,w.status,w.chapters&&'Ch '+w.chapters].filter(Boolean).join(' · '))}</div></td><td>${esc(w.author)}</td><td class="sum">${esc((w.summary||'').slice(0,160))}${(w.summary||'').length>160?'…':''}</td><td class="n">${fmt(w.words)}</td><td class="n">${fmt(w.likes)}${dl}</td><td class="n">${fmt(w.hits)}</td><td class="n">${fmt(w.bookmarks)}</td><td class="n">${fmt(w.comments)}</td><td class="sum">${esc(w.notes)}</td><td class="n">${esc(w.read)}${w.upd?`<div class="sum">upd ${esc(w.upd)}</div>`:''}</td></tr>`}).join(''):`<tr><td colspan="10" class="empty">${W.length?'No works match this date range or search.':'No works yet. Use Paste import, Import file, or + Add.'}</td></tr>`;
+  return `<tr data-i="${i}" style="cursor:pointer"><td>${href?`<a href="${href}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(w.title||href)}</a>`:esc(w.title)}<div class="sum">${esc([w.fandom,w.language,w.rating,w.status].filter(Boolean).join(' · '))}</div></td><td>${esc(w.author)}</td><td class="sum">${esc((w.summary||'').slice(0,160))}${(w.summary||'').length>160?'…':''}</td><td class="n">${fmt(w.words)}</td><td class="n">${esc(w.chapters)}</td><td class="n">${fmt(w.likes)}${dl}</td><td class="n">${fmt(w.hits)}</td><td class="n">${fmt(w.bookmarks)}</td><td class="n">${fmt(w.comments)}</td><td class="sum">${esc(w.notes)}</td><td class="n">${esc(w.read)}${w.upd?`<div class="sum">upd ${esc(w.upd)}</div>`:''}</td></tr>`}).join(''):`<tr><td colspan="11" class="empty">${W.length?'No works match this date range or search.':'No works yet. Use Paste import, Import file, or + Add.'}</td></tr>`;
  const rd=D.filter(w=>w.read),tw=rd.reduce((s,w)=>s+(w.words||0),0),au={};D.forEach(w=>{if(w.author)au[w.author]=(au[w.author]||0)+1});
  const top=Object.entries(au).sort((a,b)=>b[1]-a[1])[0],lk=D.filter(w=>w.likes!=null);
  const pr=prior(),P=pr?mets(W.filter(w=>w.read&&w.read>=pr[0]&&w.read<=pr[1])):null,M=mets(D),dd=k=>P?pct(M[k],P[k],pr[2]):'';
