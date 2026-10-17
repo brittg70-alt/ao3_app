@@ -3,10 +3,10 @@
 A single-file web app for tracking stats from your AO3 bookmarks over time. No build step, no backend.
 
 ## Features
-- Table of works: link, title, author, summary, word count, likes (kudos), notes, read date, plus fandom, rating, status, chapters, hits
+- Table of works: link, title, author, summary, word count, likes (kudos), notes, read date, plus fandom, rating, tags, status, chapters, hits
 - Bulk import from a spreadsheet: paste cells, or upload `.csv`, `.tsv`, or `.xlsx`
 - Dated stat snapshots: re-importing or editing a work logs changes in likes, words, and hits
-- Monthly words-read chart, search, filter, sort, CSV export
+- Date filters (default: year to date), search, sort, monthly words chart, collapsible insights (fandoms, tags, authors, pace, length mix, like gainers), CSV export
 
 ## Usage
 Open `index.html` in a browser, or enable GitHub Pages (Settings → Pages → deploy from `main`, root).

@@ -47,6 +47,7 @@ textarea{width:100%;min-height:180px;font-family:ui-monospace,monospace;font-siz
 .row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
 .hint{font:12px system-ui,sans-serif;color:var(--mut);margin:6px 0}
 .hist{font:12px system-ui,sans-serif;margin-top:10px;max-height:130px;overflow:auto}
+details{background:var(--card);border:1px solid var(--bd);border-radius:8px;margin-bottom:8px}summary{cursor:pointer;padding:9px 12px;font:600 13px system-ui,sans-serif}details>div{padding:0 12px 12px}.ig{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.ig b{font:600 12px system-ui,sans-serif;color:var(--mut)}.mini{min-width:0;font:13px system-ui,sans-serif}.mini th{background:none;cursor:default}.mini td,.mini th{padding:4px 6px}.mini td.n{white-space:normal}
 #toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:20px;font:13px system-ui,sans-serif;display:none;z-index:99}
 </style>
 </head>
@@ -56,9 +57,10 @@ textarea{width:100%;min-height:180px;font-family:ui-monospace,monospace;font-siz
 <p class="sub">Import your bookmarks, then re-import or edit later to log how stats change over time.</p>
 <div class="cards" id="cards"></div>
 <div class="panel"><h2>Words read per month</h2><div class="bars" id="bars"></div></div>
+<div id="ins"></div>
 <div class="tools">
 <input id="search" type="search" placeholder="Search title, author, fandom, notes…">
-<select id="flt"><option value="all">All</option><option value="read">Read</option><option value="unread">No read date</option></select>
+<select id="flt"><option value="ytd">Year to date</option><option value="m">This month</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last 12 months</option><option value="ly">Last year</option><option value="all">All time</option><option value="none">No read date</option><option value="c">Custom range…</option></select><input id="df" type="date" hidden><input id="dt" type="date" hidden>
 <button class="pri" id="add">+ Add</button>
 <button id="paste">Paste import</button>
 <button id="file">Import file</button>
@@ -71,7 +73,7 @@ textarea{width:100%;min-height:180px;font-family:ui-monospace,monospace;font-siz
 </main>
 
 <dialog id="dp"><b>Paste from spreadsheet</b>
-<p class="hint">Copy cells including the header row and paste below. Recognized headers: link, title, author, summary, word_count, likes (or kudos), notes, read_date, fandom, rating, status, chapters, hits. Without a header row, columns are assumed in the order link, title, author, summary, word_count, likes, notes, read_date.</p>
+<p class="hint">Copy cells including the header row and paste below. Recognized headers: link, title, author, summary, word_count, likes (or kudos), notes, read_date, fandom, rating, tags, status, chapters, hits. Without a header row, columns are assumed in the order link, title, author, summary, word_count, likes, notes, read_date.</p>
 <textarea id="pt"></textarea>
 <div class="row"><button id="pc">Cancel</button><button class="pri" id="pg">Import</button></div></dialog>
 
@@ -84,9 +86,9 @@ textarea{width:100%;min-height:180px;font-family:ui-monospace,monospace;font-siz
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const K='ao3tracker.v1';
-const F=[['link','Link','f'],['title','Title','f'],['author','Author'],['fandom','Fandom'],['summary','Summary','f'],['words','Word count'],['likes','Likes / kudos'],['hits','Hits'],['chapters','Chapters'],['rating','Rating'],['status','Status'],['read','Read date'],['notes','Notes','f']];
+const F=[['link','Link','f'],['title','Title','f'],['author','Author'],['fandom','Fandom'],['summary','Summary','f'],['words','Word count'],['likes','Likes / kudos'],['hits','Hits'],['chapters','Chapters'],['rating','Rating'],['tags','Tags (comma-separated)','f'],['status','Status'],['read','Read date'],['notes','Notes','f']];
 const NUM=['words','likes','hits'];
-const AL={link:['link','url','workurl','href'],title:['title','worktitle','name'],author:['author','authors','creator'],summary:['summary','description','blurb'],words:['wordcount','words','length'],likes:['likes','kudos'],notes:['notes','note','mynotes'],read:['readdate','read','dateread','dateadded'],fandom:['fandom','fandoms'],rating:['rating'],status:['status','complete'],chapters:['chapters'],hits:['hits']};
+const AL={link:['link','url','workurl','href'],title:['title','worktitle','name'],author:['author','authors','creator'],summary:['summary','description','blurb'],words:['wordcount','words','length'],likes:['likes','kudos'],notes:['notes','note','mynotes'],read:['readdate','read','dateread','dateadded'],fandom:['fandom','fandoms'],rating:['rating'],status:['status','complete'],chapters:['chapters'],hits:['hits'],tags:['tags','tag','freeforms','additionaltags','freeformtags']};
 const DEF=['link','title','author','summary','words','likes','notes','read'];
 let W=[],sort={k:'read',d:-1},cur=null;
 const $=id=>document.getElementById(id);
@@ -128,23 +130,49 @@ function importText(t){
   if(!rec.title&&!rec.link)return;
   const ex=findW(rec);
   if(ex){Object.assign(ex,rec);ex.upd=today();if(snap(ex))c++;u++}else{const w={title:'',author:'',summary:'',notes:'',read:'',words:null,likes:null,hits:null,...rec};snap(w);W.push(w);a++}});
- save();render();toast(`Imported: ${a} new, ${u} matched existing works and were updated (${c} had changed stats).`)}
+ save();render();toast(`Imported: ${a} new, ${u} matched existing works and were updated (${c} had changed stats).${W.some(w=>!inRange(w))?' Some works are outside the current date filter.':''}`)}
+function range(){const v=$('flt').value,t=new Date(),iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),y=t.getFullYear(),ago=n=>{const d=new Date(t);d.setDate(d.getDate()-n);return iso(d)};
+ if(v==='ytd')return[y+'-01-01',iso(t)];if(v==='m')return[iso(t).slice(0,7)+'-01',iso(t)];
+ if(v==='30'||v==='90')return[ago(+v),iso(t)];if(v==='365')return[ago(365),iso(t)];
+ if(v==='ly')return[(y-1)+'-01-01',(y-1)+'-12-31'];
+ return[$('df').value||'0000',$('dt').value||'9999']}
+function inRange(w){const v=$('flt').value;if(v==='all')return true;if(v==='none')return !w.read;const r=range();return !!w.read&&w.read>=r[0]&&w.read<=r[1]}
+const sp=s=>String(s||'').split(/[;,|]/);
+function grp(L,fn){const g={};L.forEach(w=>fn(w).forEach(k=>{k=k.trim();if(!k)return;const o=g[k]=g[k]||{k,n:0,w:0,l:0,ln:0};o.n++;o.w+=w.words||0;if(w.likes!=null){o.l+=w.likes;o.ln++}}));return Object.values(g).map(o=>({...o,avg:o.ln?Math.round(o.l/o.ln):null}))}
+function tbl(rows,h){return rows.length?`<table class="mini"><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map((c,i)=>`<td${i?' class="n"':''}>${c}</td>`).join('')}</tr>`).join('')}</table>`:'<span class="hint">Not enough data yet.</span>'}
+function insights(D){
+ const op=[...document.querySelectorAll('#ins details[open]')].map(d=>d.dataset.k),top=(a,f,n=10)=>a.slice().sort(f).slice(0,n),N=x=>fmt(x),A=x=>x==null?'—':fmt(x);
+ const fd=grp(D,w=>sp(w.fandom)),tg=grp(D,w=>sp(w.tags)),au=grp(D,w=>[w.author||'']),cnt=(a,b)=>b.n-a.n||b.w-a.w,r3=o=>[esc(o.k),o.n,N(o.w),A(o.avg)];
+ const best=top(tg.filter(o=>o.n>=2&&o.avg!=null),(a,b)=>b.avg-a.avg),rd=D.filter(w=>w.read&&w.words!=null),lg=top(rd,(a,b)=>b.words-a.words,1)[0],sh=top(rd,(a,b)=>a.words-b.words,1)[0];
+ const mo={};D.forEach(w=>{const k=(w.read||'').slice(0,7);if(k)mo[k]=(mo[k]||0)+1});const bm=Object.entries(mo).sort((a,b)=>b[1]-a[1])[0];
+ const tw=D.reduce((s,w)=>s+(w.words||0),0),wn=D.filter(w=>w.words!=null).length;
+ const bk=[['Under 10k',0,1e4],['10k–50k',1e4,5e4],['50k–100k',5e4,1e5],['100k+',1e5,1e12]].map(([l,a,b])=>[l,D.filter(w=>w.words!=null&&w.words>=a&&w.words<b).length]);
+ const g=D.map(w=>{const h=w.hist||[];if(h.length<2)return null;const f=h[0],l=h[h.length-1];return f.likes!=null&&l.likes!=null?{t:w.title,d:l.likes-f.likes,s:f.d}:null}).filter(x=>x&&x.d>0);
+ const S=[
+ ['fandom','Fandoms',tbl(top(fd,cnt).map(r3),['Fandom','Works','Words','Avg likes'])],
+ ['tags','Tags',`<div class="ig"><div><b>Most read</b>${tbl(top(tg,cnt).map(o=>[esc(o.k),o.n,A(o.avg)]),['Tag','Works','Avg likes'])}</div><div><b>Highest avg likes (2+ works)</b>${tbl(best.map(o=>[esc(o.k),o.n,A(o.avg)]),['Tag','Works','Avg likes'])}</div></div>`],
+ ['auth','Authors',tbl(top(au,cnt).map(r3),['Author','Works','Words','Avg likes'])],
+ ['pace','Reading pace',tbl([['Works',D.length],['Total words',N(tw)],['Average length',wn?N(Math.round(tw/wn)):'—'],['Longest',lg?esc(lg.title)+' ('+N(lg.words)+')':'—'],['Shortest',sh?esc(sh.title)+' ('+N(sh.words)+')':'—'],['Busiest month',bm?bm[0]+' ('+bm[1]+' works)':'—']],['Stat','Value'])],
+ ['mix','Length, rating & status',`<div class="ig"><div><b>Length</b>${tbl(bk,['Range','Works'])}</div><div><b>Rating</b>${tbl(top(grp(D,w=>[w.rating||'']),cnt).map(o=>[esc(o.k),o.n]),['Rating','Works'])}</div><div><b>Status</b>${tbl(top(grp(D,w=>[w.status||'']),cnt).map(o=>[esc(o.k),o.n]),['Status','Works'])}</div></div>`],
+ ['gain','Biggest like gainers',tbl(top(g,(a,b)=>b.d-a.d).map(x=>[esc(x.t),'+'+N(x.d),'since '+x.s]),['Work','Likes gained','Tracked'])]];
+ $('ins').innerHTML=S.map(([k,t,h])=>`<details data-k="${k}"${op.includes(k)?' open':''}><summary>${t}</summary><div>${h}</div></details>`).join('')}
 function render(){
  const q=$('search').value.toLowerCase(),fl=$('flt').value;
- let L=W.filter(w=>(fl==='all'||(fl==='read')===!!w.read)&&(!q||[w.title,w.author,w.fandom,w.notes,w.summary].join(' ').toLowerCase().includes(q)));
+ const D=W.filter(inRange);
+ let L=D.filter(w=>!q||[w.title,w.author,w.fandom,w.tags,w.notes,w.summary].join(' ').toLowerCase().includes(q));
  L.sort((x,y)=>{let a=x[sort.k],b=y[sort.k];const nu=NUM.includes(sort.k);if(a==null||a==='')return 1;if(b==null||b==='')return -1;
   return (nu?a-b:String(a).localeCompare(String(b)))*sort.d});
  const cols=[['title','Title'],['author','Author'],['summary','Summary'],['words','Words'],['likes','Likes'],['notes','Notes'],['read','Read']];
  $('head').innerHTML=cols.map(([k,l])=>`<th data-k="${k}">${l}${sort.k===k?(sort.d>0?' ▲':' ▼'):''}</th>`).join('');
  $('body').innerHTML=L.length?L.map(w=>{const i=W.indexOf(w),h=w.hist||[],p=h.length>1?h[h.length-2]:null,dl=p&&w.likes!=null&&p.likes!=null&&w.likes!==p.likes?`<span class="d">${w.likes>p.likes?'+':''}${w.likes-p.likes}</span>`:'';
   const href=/^https?:\/\//i.test(w.link||'')?esc(w.link):'';
-  return `<tr data-i="${i}" style="cursor:pointer"><td>${href?`<a href="${href}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(w.title||href)}</a>`:esc(w.title)}<div class="sum">${esc([w.fandom,w.rating,w.status].filter(Boolean).join(' · '))}</div></td><td>${esc(w.author)}</td><td class="sum">${esc((w.summary||'').slice(0,160))}${(w.summary||'').length>160?'…':''}</td><td class="n">${fmt(w.words)}</td><td class="n">${fmt(w.likes)}${dl}</td><td class="sum">${esc(w.notes)}</td><td class="n">${esc(w.read)}${w.upd?`<div class="sum">upd ${esc(w.upd)}</div>`:''}</td></tr>`}).join(''):`<tr><td colspan="7" class="empty">${W.length?'No matches.':'No works yet. Use Paste import, Import file, or + Add.'}</td></tr>`;
- const rd=W.filter(w=>w.read),tw=rd.reduce((s,w)=>s+(w.words||0),0),au={};W.forEach(w=>{if(w.author)au[w.author]=(au[w.author]||0)+1});
- const top=Object.entries(au).sort((a,b)=>b[1]-a[1])[0],lk=W.filter(w=>w.likes!=null);
- $('cards').innerHTML=[[W.length,'Works tracked'],[rd.length,'Read'],[fmt(tw),'Words read'],[lk.length?fmt(Math.round(lk.reduce((s,w)=>s+w.likes,0)/lk.length)):'—','Avg likes'],[top?esc(top[0])+' ('+top[1]+')':'—','Most-bookmarked author']].map(([v,l])=>`<div class="card"><b>${v}</b><span>${l}</span></div>`).join('');
+  return `<tr data-i="${i}" style="cursor:pointer"><td>${href?`<a href="${href}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(w.title||href)}</a>`:esc(w.title)}<div class="sum">${esc([w.fandom,w.rating,w.status].filter(Boolean).join(' · '))}</div></td><td>${esc(w.author)}</td><td class="sum">${esc((w.summary||'').slice(0,160))}${(w.summary||'').length>160?'…':''}</td><td class="n">${fmt(w.words)}</td><td class="n">${fmt(w.likes)}${dl}</td><td class="sum">${esc(w.notes)}</td><td class="n">${esc(w.read)}${w.upd?`<div class="sum">upd ${esc(w.upd)}</div>`:''}</td></tr>`}).join(''):`<tr><td colspan="7" class="empty">${W.length?'No works match this date range or search.':'No works yet. Use Paste import, Import file, or + Add.'}</td></tr>`;
+ const rd=D.filter(w=>w.read),tw=rd.reduce((s,w)=>s+(w.words||0),0),au={};D.forEach(w=>{if(w.author)au[w.author]=(au[w.author]||0)+1});
+ const top=Object.entries(au).sort((a,b)=>b[1]-a[1])[0],lk=D.filter(w=>w.likes!=null);
+ $('cards').innerHTML=[[D.length,'Works in range'],[rd.length,'Read'],[fmt(tw),'Words read'],[lk.length?fmt(Math.round(lk.reduce((s,w)=>s+w.likes,0)/lk.length)):'—','Avg likes'],[top?esc(top[0])+' ('+top[1]+')':'—','Most-bookmarked author']].map(([v,l])=>`<div class="card"><b>${v}</b><span>${l}</span></div>`).join('');
  const m={};rd.forEach(w=>{const k=(w.read||'').slice(0,7);if(/^\d{4}-\d\d$/.test(k))m[k]=(m[k]||0)+(w.words||0)});
  const ks=Object.keys(m).sort().slice(-12),mx=Math.max(1,...ks.map(k=>m[k]));
- $('bars').innerHTML=ks.length?ks.map(k=>`<div class="bar" title="${k}: ${fmt(m[k])} words"><i style="height:${Math.max(2,m[k]/mx*80)}px"></i><small>${k.slice(2)}</small></div>`).join(''):'<span class="hint">Add read dates to see this chart.</span>'}
+ $('bars').innerHTML=ks.length?ks.map(k=>`<div class="bar" title="${k}: ${fmt(m[k])} words"><i style="height:${Math.max(2,m[k]/mx*80)}px"></i><small>${k.slice(2)}</small></div>`).join(''):'<span class="hint">Add read dates to see this chart.</span>';insights(D)}
 function openEdit(i){cur=i;const w=i==null?{}:W[i];$('et').textContent=i==null?'Add work':'Edit work';
  $('ef').innerHTML=F.map(([k,l,f])=>`<label class="${f||''}">${l}${k==='summary'||k==='notes'?`<textarea id="f_${k}" style="min-height:60px">${esc(w[k])}</textarea>`:`<input id="f_${k}" type="${k==='read'?'date':'text'}" value="${esc(w[k])}">`}</label>`).join('');
  $('edel').style.display=i==null?'none':'';
@@ -162,7 +190,7 @@ function csvOut(){const c=F.map(f=>f[0]);const q=v=>'"'+String(v??'').replace(/"
 function dl(name,txt){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/csv'}));a.download=name;document.body.appendChild(a);a.click();a.remove()}
 $('head').onclick=e=>{const k=e.target.dataset.k;if(!k)return;sort=sort.k===k?{k,d:-sort.d}:{k,d:NUM.includes(k)||k==='read'?-1:1};render()};
 $('body').onclick=e=>{const tr=e.target.closest('tr[data-i]');if(tr)openEdit(+tr.dataset.i)};
-$('search').oninput=render;$('flt').onchange=render;
+$('search').oninput=render;$('flt').onchange=()=>{const c=$('flt').value==='c';$('df').hidden=!c;$('dt').hidden=!c;render()};$('df').onchange=$('dt').onchange=render;
 $('add').onclick=()=>openEdit(null);
 $('paste').onclick=()=>{$('pt').value='';$('dp').showModal()};
 $('pc').onclick=()=>$('dp').close();
@@ -176,7 +204,7 @@ $('fi').onchange=async e=>{const f=e.target.files[0];if(!f)return;
  else importText(await f.text())}catch(err){toast('Couldn’t read that file.')}
  e.target.value=''};
 $('exp').onclick=()=>dl('ao3-bookmarks-'+today()+'.csv',csvOut());
-$('tpl').onclick=()=>dl('ao3-template.csv',F.map(f=>f[0]).join(',')+'\nhttps://archiveofourown.org/works/123456,Example Title,Example Author,Example Fandom,"A short summary, with a comma",54000,1200,30000,12 of 12,Teen And Up,Complete,2026-01-15,Loved the slow burn\n');
+$('tpl').onclick=()=>dl('ao3-template.csv',F.map(f=>f[0]).join(',')+'\nhttps://archiveofourown.org/works/123456,Example Title,Example Author,Example Fandom,"A short summary, with a comma",54000,1200,30000,12 of 12,Teen And Up,"Slow Burn, Angst",Complete,2026-01-15,Loved the slow burn\n');
 load();render();
 </script>
 </body>
