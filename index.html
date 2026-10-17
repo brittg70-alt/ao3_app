@@ -47,6 +47,7 @@ textarea{width:100%;min-height:180px;font-family:ui-monospace,monospace;font-siz
 .row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
 .hint{font:12px system-ui,sans-serif;color:var(--mut);margin:6px 0}
 .hist{font:12px system-ui,sans-serif;margin-top:10px;max-height:130px;overflow:auto}
+.pc{display:block;margin-top:2px;font:600 11px system-ui,sans-serif;color:var(--mut)}.pc.up{color:#2e8b57}.pc.dn{color:#c0392b}
 details{background:var(--card);border:1px solid var(--bd);border-radius:8px;margin-bottom:8px}summary{cursor:pointer;padding:9px 12px;font:600 13px system-ui,sans-serif}details>div{padding:0 12px 12px}.ig{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.ig b{font:600 12px system-ui,sans-serif;color:var(--mut)}.mini{min-width:0;font:13px system-ui,sans-serif}.mini th{background:none;cursor:default}.mini td,.mini th{padding:4px 6px}.mini td.n{white-space:normal}
 #toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:20px;font:13px system-ui,sans-serif;display:none;z-index:99}
 </style>
@@ -88,7 +89,7 @@ details{background:var(--card);border:1px solid var(--bd);border-radius:8px;marg
 const K='ao3tracker.v1';
 const F=[['link','Link','f'],['title','Title','f'],['author','Author'],['fandom','Fandom'],['language','Language'],['summary','Summary','f'],['words','Word count'],['likes','Kudos'],['hits','Hits'],['bookmarks','Bookmarks'],['comments','Comments'],['chapters','Chapters'],['rating','Rating'],['tags','Tags (comma-separated)','f'],['status','Status'],['read','Read date'],['notes','Notes','f']];
 const NUM=['words','likes','hits','bookmarks','comments'];
-const AL={link:['link','url','workurl','href'],title:['title','worktitle','name'],author:['author','authors','creator'],summary:['summary','description','blurb'],words:['wordcount','words','length'],likes:['likes','kudos'],notes:['notes','note','mynotes'],read:['readdate','read','dateread','dateadded'],fandom:['fandom','fandoms'],rating:['rating'],status:['status','complete'],chapters:['chapters'],hits:['hits'],tags:['tags','tag','freeforms','additionaltags','freeformtags'],language:['language','lang'],bookmarks:['bookmarks','bookmarkscount','bookmarkcount'],comments:['comments','commentscount','commentcount']};
+const AL={link:['link','url','workurl','href'],title:['title','worktitle','name'],author:['author','authors','creator'],summary:['summary','description','blurb'],words:['wordcount','words','length'],likes:['likes','kudos'],notes:['notes','note','mynotes'],read:['readdate','read','dateread','dateadded'],fandom:['fandom','fandoms'],rating:['rating'],status:['status','complete'],chapters:['chapters','chaptercount','chapternumber','numberofchapters'],hits:['hits'],tags:['tags','tag','freeforms','additionaltags','freeformtags'],language:['language','lang'],bookmarks:['bookmarks','bookmarkscount','bookmarkcount'],comments:['comments','commentscount','commentcount']};
 const DEF=['link','title','author','summary','words','likes','notes','read'];
 let W=[],sort={k:'read',d:-1},cur=null;
 const $=id=>document.getElementById(id);
@@ -126,14 +127,24 @@ function importText(t){
  if(!map.includes('title')&&!map.includes('link')){map=DEF;data=rows}
  let a=0,u=0,c=0;
  data.forEach(r=>{const rec={};map.forEach((k,i)=>{if(k&&r[i]!=null&&r[i].trim()!=='')rec[k]=r[i].trim()});
-  NUM.forEach(k=>{if(k in rec)rec[k]=num(rec[k])});if(rec.read)rec.read=nd(rec.read);if(rec.chapters&&/^\d+$/.test(rec.chapters)===false)rec.chapters=rec.chapters;
+  NUM.forEach(k=>{if(k in rec)rec[k]=num(rec[k])});if(rec.read)rec.read=nd(rec.read);if(rec.chapters){const c=String(rec.chapters);let m;if(/^\d{4}-\d\d-\d\d$/.test(c)){const p=c.split('-');rec.chapters=(+p[1])+'/'+(+p[2])}else if(m=c.match(/^(\d{1,2})-([A-Za-z]{3})/)){const mi=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[2].toLowerCase())+1;if(mi)rec.chapters=mi+'/'+(+m[1])}}
   if(!rec.title&&!rec.link)return;
   const ex=findW(rec);
   if(ex){Object.assign(ex,rec);ex.upd=today();if(snap(ex))c++;u++}else{const w={title:'',author:'',summary:'',notes:'',read:'',words:null,likes:null,hits:null,...rec};snap(w);W.push(w);a++}});
  save();render();toast(`Imported: ${a} new, ${u} matched existing works and were updated (${c} had changed stats).${W.some(w=>!inRange(w))?' Some works are outside the current date filter.':''}`)}
+const isod=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function prior(){const v=$('flt').value,t=new Date(),y=t.getFullYear();
+ if(v==='ytd')return[(y-1)+'-01-01',isod(new Date(y-1,t.getMonth(),t.getDate())),'last year to date'];
+ if(v==='m'){const pm=new Date(y,t.getMonth()-1,1),dim=new Date(y,t.getMonth(),0).getDate();return[isod(pm),isod(new Date(pm.getFullYear(),pm.getMonth(),Math.min(t.getDate(),dim))),'last month to date']}
+ if(v==='ly')return[(y-2)+'-01-01',(y-2)+'-12-31','the year before'];
+ if(!['30','90','365','c'].includes(v)||(v==='c'&&!($('df').value&&$('dt').value)))return null;
+ const r=range(),a=new Date(r[0]+'T00:00:00'),b=new Date(r[1]+'T00:00:00'),len=Math.round((b-a)/864e5)+1,e=new Date(a);e.setDate(e.getDate()-1);const s=new Date(e);s.setDate(s.getDate()-(len-1));
+ return len>0?[isod(s),isod(e),'the previous '+len+' days']:null}
+function mets(L){const rd=L.filter(w=>w.read),lk=L.filter(w=>w.likes!=null);return{n:rd.length,w:rd.reduce((s,w)=>s+(w.words||0),0),k:lk.length?lk.reduce((s,w)=>s+w.likes,0)/lk.length:null,c:wpc(L)}}
+function pct(c,p,lab){if(c==null||p==null)return '';if(p===0)return c===0?'':`<span class="pc up" title="vs ${lab}: 0">▲ new</span>`;const v=(c-p)/p*100;if(Math.abs(v)<0.5)return `<span class="pc" title="vs ${lab}">▬ 0%</span>`;return `<span class="pc ${v>0?'up':'dn'}" title="vs ${lab}: ${fmt(Math.round(p*10)/10)}">${v>0?'▲':'▼'} ${Math.abs(Math.round(v))}%</span>`}
 function range(){const v=$('flt').value,t=new Date(),iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),y=t.getFullYear(),ago=n=>{const d=new Date(t);d.setDate(d.getDate()-n);return iso(d)};
  if(v==='ytd')return[y+'-01-01',iso(t)];if(v==='m')return[iso(t).slice(0,7)+'-01',iso(t)];
- if(v==='30'||v==='90')return[ago(+v),iso(t)];if(v==='365')return[ago(365),iso(t)];
+ if(v==='30'||v==='90')return[ago(+v-1),iso(t)];if(v==='365')return[ago(364),iso(t)];
  if(v==='ly')return[(y-1)+'-01-01',(y-1)+'-12-31'];
  return[$('df').value||'0000',$('dt').value||'9999']}
 function inRange(w){const v=$('flt').value;if(v==='all')return true;if(v==='none')return !w.read;const r=range();return !!w.read&&w.read>=r[0]&&w.read<=r[1]}
@@ -169,7 +180,8 @@ function render(){
   return `<tr data-i="${i}" style="cursor:pointer"><td>${href?`<a href="${href}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(w.title||href)}</a>`:esc(w.title)}<div class="sum">${esc([w.fandom,w.language,w.rating,w.status,w.chapters&&'Ch '+w.chapters].filter(Boolean).join(' · '))}</div></td><td>${esc(w.author)}</td><td class="sum">${esc((w.summary||'').slice(0,160))}${(w.summary||'').length>160?'…':''}</td><td class="n">${fmt(w.words)}</td><td class="n">${fmt(w.likes)}${dl}</td><td class="n">${fmt(w.hits)}</td><td class="n">${fmt(w.bookmarks)}</td><td class="n">${fmt(w.comments)}</td><td class="sum">${esc(w.notes)}</td><td class="n">${esc(w.read)}${w.upd?`<div class="sum">upd ${esc(w.upd)}</div>`:''}</td></tr>`}).join(''):`<tr><td colspan="10" class="empty">${W.length?'No works match this date range or search.':'No works yet. Use Paste import, Import file, or + Add.'}</td></tr>`;
  const rd=D.filter(w=>w.read),tw=rd.reduce((s,w)=>s+(w.words||0),0),au={};D.forEach(w=>{if(w.author)au[w.author]=(au[w.author]||0)+1});
  const top=Object.entries(au).sort((a,b)=>b[1]-a[1])[0],lk=D.filter(w=>w.likes!=null);
- $('cards').innerHTML=[[D.length,'Works in range'],[rd.length,'Read'],[fmt(tw),'Words read'],[lk.length?fmt(Math.round(lk.reduce((s,w)=>s+w.likes,0)/lk.length)):'—','Avg kudos'],[wpc(D)==null?'—':fmt(wpc(D)),'Avg words / chapter']].map(([v,l])=>`<div class="card"><b>${v}</b><span>${l}</span></div>`).join('');
+ const pr=prior(),P=pr?mets(W.filter(w=>w.read&&w.read>=pr[0]&&w.read<=pr[1])):null,M=mets(D),dd=k=>P?pct(M[k],P[k],pr[2]):'';
+ $('cards').innerHTML=[[D.length,'Works in range'],[rd.length,'Read',dd('n')],[fmt(tw),'Words read',dd('w')],[lk.length?fmt(Math.round(lk.reduce((s,w)=>s+w.likes,0)/lk.length)):'—','Avg kudos',dd('k')],[wpc(D)==null?'—':fmt(wpc(D)),'Avg words / chapter',dd('c')]].map(([v,l,d])=>`<div class="card"><b>${v}</b><span>${l}</span>${d||''}</div>`).join('')+(pr?`<div class="hint" style="grid-column:1/-1;margin:0">▲▼ compared with ${pr[2]} (${pr[0]} to ${pr[1]})</div>`:'');
  const m={};W.forEach(w=>{const k=(w.read||'').slice(0,7);if(/^\d{4}-\d\d$/.test(k))m[k]=(m[k]||0)+(w.words||0)});
  const yr=new Date().getFullYear(),ks=[];for(let i=1;i<=new Date().getMonth()+1;i++){const k=yr+'-'+String(i).padStart(2,'0');m[k]=m[k]||0;ks.push(k)}const mx=Math.max(1,...ks.map(k=>m[k]));
  $('bars').innerHTML=ks.length?ks.map(k=>`<div class="bar" title="${k}: ${fmt(m[k])} words"><i style="height:${Math.max(2,m[k]/mx*80)}px"></i><small>${k.slice(2)}</small></div>`).join(''):'<span class="hint">Add read dates to see this chart.</span>';insights(D)}
