@@ -1,6 +1,6 @@
 # AO3 Bookmark Tracker
 
-A single-file web app for tracking stats from your AO3 bookmarks over time. No build step, no backend.
+A single-file web app for tracking stats from your AO3 bookmarks over time. 
 
 ## Features
 - Table of works: link, title, author, summary, word count, kudos, notes, read date, plus fandom, language, rating, tags, status, chapters, hits, bookmarks count, comments count, bookmarked date
